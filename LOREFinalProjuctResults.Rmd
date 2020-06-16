@@ -1,0 +1,122 @@
+---
+title: "Untitled"
+author: "Daniel Kim"
+date: "4/18/2020"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(estimatr)
+library(randomizr)
+data <- read.csv("~/Documents/FinalData.csv")
+```
+
+```{r}
+dat <- data[,c(2,3,4,5)]
+cor(dat)
+dat1 <- data[,c(7,8,9,10)]
+cor(dat1)
+```
+
+```{r}
+summary_df <-
+  data %>%
+  group_by(Treatment) %>%
+  summarise(group_mean = mean(Avg.Score))
+
+summary_df1 <-
+  data %>%
+  group_by(Treatment) %>%
+  summarise(group_mean = mean(Avg.Iscore))
+```
+
+```{r}
+ggplot(summary_df, aes(Treatment, group_mean)) +
+  geom_col()
+
+ggplot(summary_df1, aes(Treatment, group_mean)) +
+  geom_col()
+```
+
+```{r}
+fit <- lm_robust(Avg.Score ~ Treatment, data = data)
+fit
+
+fit1 <- lm_robust(Avg.Iscore ~ Treatment, data = data)
+fit1
+
+fit2 <- lm_robust(Avg.Score ~ Treatment + Looksold + Treatment*Looksold, data = data)
+fit2
+
+fit3 <- lm_robust(Avg.Iscore ~ Treatment + Looksold + Treatment*Looksold, data = data)
+fit3
+```
+
+```{r}
+fits <- list()
+sims <- 500
+N <- 30
+
+for (i in 1:sims) {
+  dat <- read.csv("~/Documents/FinalData.csv")
+  data <-
+    tibble(Y0 = sample((dat$Avg.Score[dat$Treatment == 0]), N, replace = TRUE),
+    Y1 = sample((dat$Avg.Score[dat$Treatment == 1]), N, replace = TRUE)) %>%
+    mutate(Z = complete_ra(N = N),
+           Y = Y1 * Z + Y0 * (1 - Z))
+  
+  fit <- lm_robust(Y ~ Z, data = data)
+  fits[[i]] <- fit
+}
+
+fit_summary <-
+  fits %>%
+  map(tidy) %>%
+  bind_rows(.id = "sim") %>%
+  filter(term == "Z")
+
+
+ggplot(fit_summary, aes(estimate)) +
+  geom_histogram(binwidth = .1)
+
+fit_summary %>%
+  summarise(power = mean(p.value < 0.05))
+
+```
+
+```{r}
+fits <- list()
+sims <- 500
+N <- 30
+
+for (i in 1:sims) {
+  dat <- read.csv("~/Documents/FinalData.csv")
+  data <-
+    tibble(Y0 = sample((dat$Avg.Iscore[dat$Treatment == 0]), N, replace = TRUE),
+    Y1 = sample((dat$Avg.Iscore[dat$Treatment == 1]), N, replace = TRUE)) %>%
+    mutate(Z = complete_ra(N = N),
+           Y = Y1 * Z + Y0 * (1 - Z))
+  
+  fit <- lm_robust(Y ~ Z, data = data)
+  fits[[i]] <- fit
+}
+
+fit_summary <-
+  fits %>%
+  map(tidy) %>%
+  bind_rows(.id = "sim") %>%
+  filter(term == "Z")
+
+
+ggplot(fit_summary, aes(estimate)) +
+  geom_histogram(binwidth = .1)
+
+fit_summary %>%
+  summarise(power = mean(p.value < 0.05))
+
+```
+
+
+
